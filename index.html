@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Keyboard Sticks Warrior</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@500;700&display=swap');
+        
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: #0f172a;
+            margin: 0;
+            overflow: hidden;
+            touch-action: none;
+            color: #f8fafc;
+        }
+
+        .pixel-font {
+            font-family: 'Press Start 2P', cursive;
+        }
+
+        /* Glowing effects */
+        .glow-text-blue { text-shadow: 0 0 10px #3b82f6, 0 0 20px #3b82f6; }
+        .glow-text-red { text-shadow: 0 0 10px #ef4444, 0 0 20px #ef4444; }
+        .glow-text-yellow { text-shadow: 0 0 10px #eab308, 0 0 20px #eab308; }
+        
+        .health-bar-container {
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+        }
+
+        .health-fill {
+            transition: width 0.2s ease-out;
+        }
+
+        /* Word styling */
+        .word-card {
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .word-highlighted {
+            background-color: #1e293b;
+            border-color: #3b82f6 !important;
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.6);
+        }
+
+        .typed-correct { color: #4ade80; } /* Green */
+        .untyped { color: #94a3b8; } /* Gray */
+
+        /* Animations */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        .shake-err { animation: shake 0.2s ease-in-out; border-color: #ef4444 !important; color: #ef4444 !important; }
+
+        @keyframes levelUpAnim {
+            0% { transform: scale(1); opacity: 0; }
+            50% { transform: scale(1.5); opacity: 1; }
+            100% { transform: scale(1); opacity: 0; }
+        }
+        .level-up-text {
+            animation: levelUpAnim 2s ease-in-out forwards;
+        }
+
+        /* Input styling */
+        #typing-input {
+            caret-color: #3b82f6;
+        }
+        #typing-input:focus {
+            outline: none;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen relative selection:bg-transparent">
+
+    <!-- START MENU SCREEN -->
+    <div id="start-screen" class="absolute inset-0 bg-slate-900 z-50 flex flex-col items-center justify-center p-4">
+        <h1 class="pixel-font text-3xl md:text-5xl text-blue-400 mb-2 text-center glow-text-blue leading-loose">KEYBOARD STICKS</h1>
+        <h2 class="pixel-font text-2xl md:text-4xl text-red-500 mb-10 text-center glow-text-red">WARRIOR</h2>
+        
+        <div class="bg-slate-800 p-8 rounded-xl border border-slate-600 shadow-2xl w-full max-w-md">
+            <h3 class="text-2xl mb-6 text-center text-yellow-400 font-bold tracking-widest">Difficulty Select</h3>
+            
+            <div class="flex flex-col gap-4">
+                <button onclick="startGame('easy')" class="py-3 px-6 bg-slate-700 hover:bg-green-600 border-2 border-green-500 rounded-lg text-xl font-bold transition-colors">EASY (Nobice)</button>
+                <button onclick="startGame('medium')" class="py-3 px-6 bg-slate-700 hover:bg-yellow-600 border-2 border-yellow-500 rounded-lg text-xl font-bold transition-colors">MEDIUM (Fighter)</button>
+                <button onclick="startGame('hard')" class="py-3 px-6 bg-slate-700 hover:bg-red-600 border-2 border-red-500 rounded-lg text-xl font-bold transition-colors">HARD (Master)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME OVER / VICTORY SCREEN -->
+    <div id="end-screen" class="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center hidden p-4">
+        <h1 id="end-title" class="pixel-font text-4xl md:text-6xl mb-6 text-center">GAME OVER</h1>
+        <p id="end-desc" class="text-2xl text-slate-300 mb-8 text-center max-w-lg"></p>
+        <button onclick="location.reload()" class="py-4 px-8 bg-blue-600 hover:bg-blue-500 rounded-lg text-2xl font-bold uppercase tracking-widest shadow-[0_0_20px_rgba(37,99,235,0.6)]">Main Menu</button>
+    </div>
+
+    <!-- LEVEL UP NOTIFICATION -->
+    <div id="level-up-noti" class="absolute inset-0 flex items-center justify-center z-40 hidden pointer-events-none">
+        <h2 class="pixel-font text-5xl text-yellow-400 glow-text-yellow level-up-text">LEVEL UP!</h2>
+    </div>
+
+    <!-- MAIN GAME UI -->
+    <div class="w-full flex justify-between items-start px-4 md:px-8 py-4 z-10 shrink-0">
+        <!-- Player Stats -->
+        <div class="w-2/5 md:w-1/3">
+            <div class="flex justify-between mb-1 text-sm md:text-xl font-bold">
+                <span class="text-blue-400">YOU</span>
+                <span id="player-hp-text">100/100</span>
+            </div>
+            <div class="health-bar-container w-full bg-slate-800 h-6 md:h-8 rounded-md border border-slate-600 overflow-hidden relative">
+                <div id="player-hp-bar" class="bg-gradient-to-r from-blue-600 to-blue-400 h-full health-fill w-full"></div>
+            </div>
+            <div class="text-slate-400 mt-1 text-sm md:text-lg font-bold" id="score-display">Score: 0</div>
+        </div>
+
+        <!-- Level Info -->
+        <div class="text-center px-2">
+            <div class="pixel-font text-yellow-400 text-lg md:text-2xl mt-2 glow-text-yellow" id="level-display">LVL 1</div>
+            <div class="text-slate-300 text-sm md:text-lg font-bold" id="diff-display">Mode</div>
+        </div>
+
+        <!-- Enemy Stats -->
+        <div class="w-2/5 md:w-1/3">
+            <div class="flex justify-between mb-1 text-sm md:text-xl font-bold">
+                <span id="enemy-hp-text">100/100</span>
+                <span class="text-red-500">ENEMY</span>
+            </div>
+            <div class="health-bar-container w-full bg-slate-800 h-6 md:h-8 rounded-md border border-slate-600 overflow-hidden relative">
+                <div id="enemy-hp-bar" class="bg-gradient-to-l from-red-600 to-red-400 h-full health-fill w-full float-right"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- COMBAT CANVAS -->
+    <div class="flex-grow relative flex items-center justify-center pointer-events-none" id="canvas-container">
+        <canvas id="gameCanvas" width="800" height="400" class="max-w-full h-full object-contain"></canvas>
+    </div>
+
+    <!-- TYPING AREA (The "Typing Option") -->
+    <div class="bg-slate-900 border-t-2 border-slate-700 flex flex-col items-center justify-center p-4 z-20 shrink-0 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+        
+        <!-- Words on screen -->
+        <div id="words-container" class="flex flex-wrap gap-3 md:gap-6 justify-center items-center w-full max-w-5xl mb-6 min-h-[60px]">
+            <!-- JS will populate words here -->
+        </div>
+
+        <!-- Actual Input Box for Typing -->
+        <div class="w-full max-w-xl relative">
+            <input type="text" id="typing-input" autocomplete="off" spellcheck="false"
+                class="w-full bg-slate-800 border-2 border-blue-500 rounded-xl py-3 px-6 text-2xl md:text-3xl text-center font-bold text-white tracking-widest transition-colors"
+                placeholder="Type here..." />
+            <div class="absolute right-4 top-4 text-slate-400 text-lg" id="combo-display">x1</div>
+        </div>
+        <p class="text-slate-500 mt-2 text-sm">Type any word from above and press Space or complete it.</p>
+    </div>
+
+    <script>
+        // --- MASSIVE DICTIONARY CATEGORIZED BY LENGTH ---
+        const easyWords = ["ant", "bat", "cat", "dog", "egg", "fly", "gun", "hit", "ice", "job", "key", "log", "man", "net", "owl", "pen", "run", "sun", "tap", "van", "war", "box", "car", "day", "eye", "fox", "god", "hat", "ink", "joy"];
+        const mediumWords = ["apple", "brave", "crash", "dance", "eagle", "flame", "ghost", "heart", "image", "juice", "knife", "lemon", "magic", "ninja", "ocean", "power", "queen", "river", "snake", "tiger", "unity", "venom", "water", "xenon", "yacht", "zebra", "blade", "storm", "light", "shadow", "punch", "block"];
+        const hardWords = ["absolute", "brilliant", "champion", "defender", "elephant", "festival", "guardian", "hospital", "illusion", "judgment", "kangaroo", "language", "mountain", "notebook", "operator", "particle", "question", "radiance", "skeleton", "triangle", "universe", "velocity", "warrior", "keyboard", "strength", "strategy"];
+
+        // --- GAME VARIABLES ---
+        let difficulty = 'medium'; 
+        let currentLevel = 1;
+        const maxLevel = 30;
+        let score = 0;
+        let combo = 1;
+        let gameActive = false;
+        
+        // Settings based on difficulty
+        let diffSettings = {
+            easy: { speedMult: 1.2, enemyBaseHp: 30, enemyDmg: 5 },
+            medium: { speedMult: 1.0, enemyBaseHp: 50, enemyDmg: 10 },
+            hard: { speedMult: 0.7, enemyBaseHp: 80, enemyDmg: 15 }
+        };
+
+        let player = { hp: 100, maxHp: 100, state: 'idle', x: 200, y: 300, isRight: true };
+        let enemy = { hp: 100, maxHp: 100, state: 'idle', x: 600, y: 300, isRight: false };
+
+        let activeWords = []; // Array of strings
+        let enemyAttackTimer = null;
+        let animationFrameId = null;
+
+        // --- DOM ELEMENTS ---
+        const startScreen = document.getElementById('start-screen');
+        const endScreen = document.getElementById('end-screen');
+        const endTitle = document.getElementById('end-title');
+        const endDesc = document.getElementById('end-desc');
+        const levelUpNoti = document.getElementById('level-up-noti');
+        
+        const wordsContainer = document.getElementById('words-container');
+        const typingInput = document.getElementById('typing-input');
+        
+        const playerHpBar = document.getElementById('player-hp-bar');
+        const enemyHpBar = document.getElementById('enemy-hp-bar');
+        const playerHpText = document.getElementById('player-hp-text');
+        const enemyHpText = document.getElementById('enemy-hp-text');
+        const scoreDisplay = document.getElementById('score-display');
+        const levelDisplay = document.getElementById('level-display');
+        const diffDisplay = document.getElementById('diff-display');
+        const comboDisplay = document.getElementById('combo-display');
+        
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const canvasContainer = document.getElementById('canvas-container');
+
+        // Resize Canvas function to fit container
+        function resizeCanvas() {
+            canvas.width = canvasContainer.clientWidth;
+            canvas.height = canvasContainer.clientHeight;
+            // Adjust stickman positions based on width
+            player.x = canvas.width * 0.25;
+            player.y = canvas.height * 0.75;
+            enemy.x = canvas.width * 0.75;
+            enemy.y = canvas.height * 0.75;
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- GAME LOGIC ---
+
+        function startGame(selectedDiff) {
+            difficulty = selectedDiff;
+            currentLevel = 1;
+            score = 0;
+            player.hp = player.maxHp = 100;
+            
+            startScreen.classList.add('hidden');
+            diffDisplay.innerText = difficulty.toUpperCase();
+            
+            // Keep focus on input so keyboard stays open on mobile
+            document.addEventListener('click', () => { if(gameActive) typingInput.focus(); });
+            
+            resizeCanvas();
+            initLevel();
+            gameLoop();
+        }
+
+        function initLevel() {
+            if(currentLevel > maxLevel) {
+                showEndScreen(true);
+                return;
+            }
+
+            gameActive = true;
+            combo = 1;
+            typingInput.value = '';
+            typingInput.focus();
+            typingInput.classList.remove('shake-err');
+
+            // Setup Enemy for current level
+            const settings = diffSettings[difficulty];
+            enemy.maxHp = settings.enemyBaseHp + (currentLevel * 15);
+            enemy.hp = enemy.maxHp;
+            
+            player.state = 'idle';
+            enemy.state = 'idle';
+
+            levelDisplay.innerText = `LVL ${currentLevel}`;
+            
+            spawnInitialWords();
+            updateUI();
+            startEnemyAI();
+        }
+
+        function getWordBasedOnLevel() {
+            let pool = [];
+            // Randomly pick word difficulty based on level progress
+            const r = Math.random();
+            if (currentLevel < 10) {
+                pool = r < 0.7 ? easyWords : mediumWords;
+            } else if (currentLevel < 20) {
+                pool = r < 0.4 ? easyWords : (r < 0.8 ? mediumWords : hardWords);
+            } else {
+                pool = r < 0.2 ? easyWords : (r < 0.6 ? mediumWords : hardWords);
+            }
+            return pool[Math.floor(Math.random() * pool.length)];
+        }
+
+        function spawnInitialWords() {
+            activeWords = [];
+            wordsContainer.innerHTML = '';
+            const wordCount = Math.min(3 + Math.floor(currentLevel / 5), 5); // 3 to 5 words max
+            
+            for(let i=0; i<wordCount; i++) {
+                addSingleWord();
+            }
+        }
+
+        function addSingleWord() {
+            let newWord = getWordBasedOnLevel();
+            while(activeWords.includes(newWord)) {
+                newWord = getWordBasedOnLevel(); // Prevent duplicates
+            }
+            activeWords.push(newWord);
+            renderWords(typingInput.value.toLowerCase().trim());
+        }
+
+        function renderWords(currentInput) {
+            wordsContainer.innerHTML = '';
+            
+            activeWords.forEach(word => {
+                const wordSpan = document.createElement('div');
+                wordSpan.className = 'word-card bg-slate-800 border-2 border-slate-600 rounded-lg px-3 py-2 text-xl md:text-2xl font-bold tracking-wider';
+                
+                // Highlight logic
+                if (currentInput.length > 0 && word.startsWith(currentInput)) {
+                    wordSpan.classList.add('word-highlighted');
+                    const typedPart = word.substring(0, currentInput.length);
+                    const untypedPart = word.substring(currentInput.length);
+                    wordSpan.innerHTML = `<span class="typed-correct">${typedPart}</span><span class="untyped">${untypedPart}</span>`;
+                } else {
+                    wordSpan.innerHTML = `<span class="untyped">${word}</span>`;
+                }
+                
+                wordsContainer.appendChild(wordSpan);
+            });
+        }
+
+        // --- TYPING INPUT HANDLER ---
+        typingInput.addEventListener('input', (e) => {
+            if(!gameActive) return;
+            
+            const val = e.target.value.toLowerCase();
+            // Remove space if they hit space to submit
+            const cleanVal = val.replace(/\s/g, ''); 
+            
+            let matchedIndex = activeWords.indexOf(cleanVal);
+            
+            // If full word matched (either by typing it all, or typing + space)
+            if (matchedIndex !== -1 && (val.endsWith(' ') || cleanVal.length === activeWords[matchedIndex].length)) {
+                
+                // Correct typing! Attack!
+                playerAttack(activeWords[matchedIndex].length);
+                
+                // Remove word and add new
+                activeWords.splice(matchedIndex, 1);
+                e.target.value = ''; // clear input
+                e.target.classList.remove('shake-err');
+                
+                addSingleWord();
+            } 
+            else {
+                // Check if currently typed letters match start of ANY word
+                const isMatchingAny = activeWords.some(w => w.startsWith(cleanVal));
+                
+                if (!isMatchingAny && cleanVal.length > 0) {
+                    // Wrong key pressed!
+                    e.target.classList.add('shake-err');
+                    setTimeout(() => e.target.classList.remove('shake-err'), 200);
+                    combo = 1; // reset combo
+                    updateUI();
+                } else {
+                    e.target.classList.remove('shake-err');
+                }
+                
+                renderWords(cleanVal);
+            }
+        });
+
+        // Prevent space from scrolling or adding spaces to empty input
+        typingInput.addEventListener('keydown', (e) => {
+            if (e.key === ' ' && typingInput.value.trim() === '') {
+                e.preventDefault();
+            }
+        });
+
+
+        // --- COMBAT SYSTEM ---
+        function playerAttack(wordLength) {
+            player.state = 'attack';
+            setTimeout(() => { if(player.state === 'attack') player.state = 'idle'; }, 200);
+
+            enemy.state = 'hurt';
+            setTimeout(() => { if(enemy.state === 'hurt') enemy.state = 'idle'; }, 200);
+            
+            // Damage scales with word length and combo
+            const baseDmg = wordLength * 2;
+            const comboBonus = Math.floor(combo * 0.5);
+            enemy.hp -= (baseDmg + comboBonus);
+            
+            score += (10 * wordLength) + (combo * 5);
+            combo++;
+            
+            // Hit effect visual on enemy
+            enemy.x += 15;
+            setTimeout(() => { enemy.x -= 15; }, 100);
+
+            updateUI();
+            checkLevelProgress();
+        }
+
+        function startEnemyAI() {
+            clearTimeout(enemyAttackTimer);
+            if(!gameActive) return;
+
+            // Attack speed gets faster with level and difficulty
+            const settings = diffSettings[difficulty];
+            let delay = 3500 * settings.speedMult - (currentLevel * 50);
+            delay = Math.max(800, delay); // Minimum 0.8 seconds
+
+            enemyAttackTimer = setTimeout(() => {
+                if(!gameActive) return;
+                
+                enemy.state = 'attack';
+                setTimeout(() => { if(enemy.state === 'attack') enemy.state = 'idle'; }, 300);
+
+                player.state = 'hurt';
+                setTimeout(() => { if(player.state === 'hurt') player.state = 'idle'; }, 300);
+                
+                player.hp -= settings.enemyDmg;
+                combo = 1; // reset combo
+                typingInput.value = ''; // clear input to disrupt player
+                renderWords('');
+                
+                // Screen flash effect for taking damage
+                ctx.fillStyle = "rgba(239, 68, 68, 0.3)";
+                ctx.fillRect(0,0, canvas.width, canvas.height);
+
+                updateUI();
+                
+                if (player.hp <= 0) {
+                    showEndScreen(false);
+                } else {
+                    startEnemyAI();
+                }
+            }, delay);
+        }
+
+        function checkLevelProgress() {
+            if (enemy.hp <= 0) {
+                // ENEMY DEFEATED -> LEVEL UP
+                gameActive = false;
+                clearTimeout(enemyAttackTimer);
+                enemy.hp = 0;
+                enemy.state = 'dead';
+                updateUI();
+
+                // Show Level Up Animation
+                levelUpNoti.classList.remove('hidden');
+                
+                // Heal player slightly (20 HP)
+                player.hp = Math.min(player.maxHp, player.hp + 20);
+                
+                setTimeout(() => {
+                    levelUpNoti.classList.add('hidden');
+                    currentLevel++;
+                    initLevel();
+                }, 2000);
+            }
+        }
+
+        function showEndScreen(isVictory) {
+            gameActive = false;
+            clearTimeout(enemyAttackTimer);
+            endScreen.classList.remove('hidden');
+            typingInput.blur(); // remove keyboard
+            
+            if (isVictory) {
+                endTitle.innerText = "VICTORY!";
+                endTitle.className = "pixel-font text-5xl md:text-7xl mb-6 text-center text-yellow-400 glow-text-yellow";
+                endDesc.innerText = `You cleared all 30 levels!\nDifficulty: ${difficulty.toUpperCase()}\nFinal Score: ${score}`;
+            } else {
+                player.state = 'dead';
+                endTitle.innerText = "GAME OVER";
+                endTitle.className = "pixel-font text-5xl md:text-7xl mb-6 text-center text-red-500 glow-text-red";
+                endDesc.innerText = `You died at Level ${currentLevel}.\nFinal Score: ${score}`;
+            }
+        }
+
+        function updateUI() {
+            playerHpBar.style.width = `${Math.max(0, (player.hp / player.maxHp) * 100)}%`;
+            playerHpText.innerText = `${Math.max(0, player.hp)}/${player.maxHp}`;
+            
+            enemyHpBar.style.width = `${Math.max(0, (enemy.hp / enemy.maxHp) * 100)}%`;
+            enemyHpText.innerText = `${Math.max(0, enemy.hp)}/${enemy.maxHp}`;
+            
+            scoreDisplay.innerText = `Score: ${score}`;
+            comboDisplay.innerText = `x${combo}`;
+            
+            if (combo > 5) {
+                comboDisplay.className = "absolute right-4 top-4 text-2xl font-bold text-yellow-400 animate-pulse";
+            } else if (combo > 2) {
+                comboDisplay.className = "absolute right-4 top-4 text-xl font-bold text-green-400";
+            } else {
+                comboDisplay.className = "absolute right-4 top-4 text-lg text-slate-400";
+            }
+        }
+
+        // --- DRAWING STICKMEN (CANVAS) ---
+        function drawLine(x1, y1, x2, y2, color, width) {
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.lineCap = "round";
+            ctx.stroke();
+        }
+
+        function drawStickman(stickman, isPlayer) {
+            ctx.save();
+            ctx.translate(stickman.x, stickman.y);
+            if (!stickman.isRight) ctx.scale(-1, 1);
+
+            const color = isPlayer ? "#60a5fa" : "#ef4444"; 
+            const scale = canvas.height / 400; // responsive scale
+            ctx.scale(scale, scale);
+
+            if (stickman.state === 'dead') {
+                ctx.translate(0, 50); 
+                ctx.rotate(Math.PI / 2);
+            } else if (stickman.state === 'hurt') {
+                ctx.rotate(-Math.PI / 8); 
+            }
+
+            // Head
+            ctx.beginPath();
+            ctx.arc(0, -70, 18, 0, Math.PI * 2);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            
+            // Body
+            drawLine(0, -52, 0, 10, color, 5);
+
+            if (stickman.state === 'idle') {
+                drawLine(0, -35, -20, -10, color, 4); // Back arm
+                drawLine(0, -35, 20, -10, color, 4);  // Front arm
+                drawLine(0, 10, -15, 60, color, 5); // Back leg
+                drawLine(0, 10, 15, 60, color, 5);  // Front leg
+            } 
+            else if (stickman.state === 'attack') {
+                drawLine(0, -35, -20, -10, color, 4); 
+                drawLine(0, -35, 60, -35, "white", 5);  // Punching arm flashes white
+                drawLine(0, 10, -25, 60, color, 5);
+                drawLine(0, 10, 35, 60, color, 5);
+                
+                // Draw a simple hit effect
+                ctx.beginPath();
+                ctx.arc(65, -35, 10, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+                ctx.fill();
+            }
+            else if (stickman.state === 'hurt') {
+                drawLine(0, -35, -30, -50, color, 4);
+                drawLine(0, -35, 30, -50, color, 4);
+                drawLine(0, 10, -20, 55, color, 5);
+                drawLine(0, 10, 10, 60, color, 5);
+            }
+            else if (stickman.state === 'dead') {
+                drawLine(0, -35, -20, -10, color, 4); 
+                drawLine(0, -35, 20, -10, color, 4); 
+                drawLine(0, 10, -15, 60, color, 5);
+                drawLine(0, 10, 15, 60, color, 5);
+            }
+            ctx.restore();
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Ground Line
+            const groundY = player.y + (60 * (canvas.height/400));
+            drawLine(0, groundY, canvas.width, groundY, "#334155", 3);
+            
+            drawStickman(player, true);
+            drawStickman(enemy, false);
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // Initial setup for background before game starts
+        resizeCanvas();
+        gameLoop();
+        
+    </script>
+</body>
+</html>
